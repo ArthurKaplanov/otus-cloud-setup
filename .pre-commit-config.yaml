@@ -39,4 +39,3 @@ repos:
         name: ruff format
         entry: uv run ruff format
         args: *paths_list
-        
