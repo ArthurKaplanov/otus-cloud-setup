@@ -102,3 +102,4 @@ override.tf.json
 .terraformrc
 terraform.rc
 key.json
+authorized_key.json

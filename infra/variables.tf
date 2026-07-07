@@ -43,3 +43,14 @@ variable "yc_security_group_name" {
   type        = string
   description = "Name of the security group"
 }
+
+variable "yc_bucket_name" {
+  type        = string
+  description = "Name of the bucket"
+}
+
+variable "yc_service_account_name" {
+  type        = string
+  description = "Name of the service account"
+  default     = "value"
+}

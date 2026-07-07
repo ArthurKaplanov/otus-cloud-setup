@@ -100,12 +100,12 @@ resource "yandex_compute_instance" "proxy" {
     user-data = "#cloud-config\ndatasource:\n Ec2:\n  strict_id: false\nssh_pwauth: no\nusers:\n- name: ubuntu\n  sudo: ALL=(ALL) NOPASSWD:ALL\n  shell: /bin/bash\n  ssh_authorized_keys:\n  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG1DB0k45xC+EYl54R0YKEehQrnU0AhEIVloB3SbF8jS https://github.com/ArthurKaplanov"
     ssh-keys  = "ubuntu:ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG1DB0k45xC+EYl54R0YKEehQrnU0AhEIVloB3SbF8jS https://github.com/ArthurKaplanov"
   }
-  name = "proxy"
+  name                      = "proxy"
   allow_stopping_for_update = true
-  
+
   network_interface {
-    subnet_id = yandex_vpc_subnet.subnet.id
-    nat       = true
+    subnet_id          = yandex_vpc_subnet.subnet.id
+    nat                = true
     security_group_ids = [yandex_vpc_security_group.security_group.id]
   }
   platform_id = "standard-v3"
@@ -133,14 +133,14 @@ resource "yandex_compute_instance" "private_vm" {
   }
   folder_id = var.yc_folder_id
   metadata = {
-    ssh-keys  = "ubuntu:ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG1DB0k45xC+EYl54R0YKEehQrnU0AhEIVloB3SbF8jS https://github.com/ArthurKaplanov"
+    ssh-keys = "ubuntu:ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG1DB0k45xC+EYl54R0YKEehQrnU0AhEIVloB3SbF8jS https://github.com/ArthurKaplanov"
   }
-  name = "our_private_machine"
+  name                      = "our_private_machine"
   allow_stopping_for_update = true
-  
+
   network_interface {
-    subnet_id = yandex_vpc_subnet.subnet.id
-    nat       = false
+    subnet_id          = yandex_vpc_subnet.subnet.id
+    nat                = false
     security_group_ids = [yandex_vpc_security_group.security_group.id]
   }
   platform_id = "standard-v3"
@@ -153,4 +153,24 @@ resource "yandex_compute_instance" "private_vm" {
     preemptible = true
   }
   zone = var.yc_zone
+}
+
+
+# object storage/ s3
+resource "yandex_storage_bucket" "data_bucket" {
+  bucket        = "${var.yc_bucket_name}-${var.yc_folder_id}"
+  access_key    = yandex_iam_service_account_static_access_key.sa_static_key.access_key
+  secret_key    = yandex_iam_service_account_static_access_key.sa_static_key.secret_key
+  force_destroy = true
+}
+
+
+#IAM service 
+data "yandex_iam_service_account" "hw2-service" {
+  name        = var.yc_service_account_name
+}
+
+resource "yandex_iam_service_account_static_access_key" "sa_static_key" {
+  service_account_id = data.yandex_iam_service_account.hw2_service.id
+  description        = "Static access key for object storage"
 }
