@@ -1,7 +1,92 @@
-resource "yandex_compute_instance" "compute-vm-2-2-10-ssd-1783175271593" {
+# Network ресурсы
+resource "yandex_vpc_network" "my_network" {
+  name = var.yc_network_name
+}
+
+resource "yandex_vpc_subnet" "subnet" {
+  name           = var.yc_subnet_name
+  zone           = var.yc_zone
+  network_id     = yandex_vpc_network.my_network.id
+  v4_cidr_blocks = [var.yc_subnet_range]
+  route_table_id = yandex_vpc_route_table.route_table.id
+}
+
+resource "yandex_vpc_gateway" "nat_gateway" {
+  name = var.yc_nat_gateway_name
+  shared_egress_gateway {}
+}
+
+resource "yandex_vpc_route_table" "route_table" {
+  name       = var.yc_route_table_name
+  network_id = yandex_vpc_network.my_network.id
+
+  static_route {
+    destination_prefix = "0.0.0.0/0"
+    gateway_id         = yandex_vpc_gateway.nat_gateway.id
+  }
+}
+
+resource "yandex_vpc_security_group" "security_group" {
+  name        = var.yc_security_group_name
+  description = "Security group for Dataproc cluster"
+  network_id  = yandex_vpc_network.my_network.id
+
+  ingress {
+    protocol       = "ANY"
+    description    = "Allow all incoming traffic"
+    v4_cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    protocol       = "TCP"
+    description    = "UI"
+    v4_cidr_blocks = ["0.0.0.0/0"]
+    port           = 443
+  }
+
+  ingress {
+    protocol       = "TCP"
+    description    = "SSH"
+    v4_cidr_blocks = ["0.0.0.0/0"]
+    port           = 22
+  }
+
+  ingress {
+    protocol       = "TCP"
+    description    = "Jupyter"
+    v4_cidr_blocks = ["0.0.0.0/0"]
+    port           = 8888
+  }
+
+  egress {
+    protocol       = "ANY"
+    description    = "Allow all outgoing traffic"
+    v4_cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    protocol       = "ANY"
+    description    = "Allow all outgoing traffic"
+    from_port      = 0
+    to_port        = 65535
+    v4_cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    protocol          = "ANY"
+    description       = "Internal"
+    from_port         = 0
+    to_port           = 65535
+    predefined_target = "self_security_group"
+  }
+}
+
+
+# compute ресурсы
+resource "yandex_compute_instance" "proxy" {
   boot_disk {
     initialize_params {
-      name       = "disk-ubuntu-20-04-lts-os-login-1783175276302"
+      name       = "disk-ubuntu-20-04-for-proxy"
       type       = "network-ssd"
       size       = 10
       block_size = 4096
@@ -15,11 +100,48 @@ resource "yandex_compute_instance" "compute-vm-2-2-10-ssd-1783175271593" {
     user-data = "#cloud-config\ndatasource:\n Ec2:\n  strict_id: false\nssh_pwauth: no\nusers:\n- name: ubuntu\n  sudo: ALL=(ALL) NOPASSWD:ALL\n  shell: /bin/bash\n  ssh_authorized_keys:\n  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG1DB0k45xC+EYl54R0YKEehQrnU0AhEIVloB3SbF8jS https://github.com/ArthurKaplanov"
     ssh-keys  = "ubuntu:ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG1DB0k45xC+EYl54R0YKEehQrnU0AhEIVloB3SbF8jS https://github.com/ArthurKaplanov"
   }
-  name = "compute-vm-2-2-10-ssd-1783175271593"
+  name = "proxy"
+  allow_stopping_for_update = true
+  
   network_interface {
-    subnet_id = "fl85dhe7vfiulk72nv9m"
-    index     = 0
+    subnet_id = yandex_vpc_subnet.subnet.id
     nat       = true
+    security_group_ids = [yandex_vpc_security_group.security_group.id]
+  }
+  platform_id = "standard-v3"
+  resources {
+    memory        = 2
+    cores         = 2
+    core_fraction = 100
+  }
+  scheduling_policy {
+    preemptible = true
+  }
+  zone = var.yc_zone
+}
+
+resource "yandex_compute_instance" "private_vm" {
+  boot_disk {
+    initialize_params {
+      name       = "disk-ubuntu-for-private_vm"
+      type       = "network-ssd"
+      size       = 10
+      block_size = 4096
+      image_id   = "fd87q9coi4v2ap1c9okf"
+    }
+    auto_delete = true
+  }
+  folder_id = var.yc_folder_id
+  metadata = {
+    ssh-keys  = "ubuntu:ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG1DB0k45xC+EYl54R0YKEehQrnU0AhEIVloB3SbF8jS https://github.com/ArthurKaplanov"
+  }
+  name = "our_private_machine"
+  allow_stopping_for_update = true
+  
+  network_interface {
+    subnet_id = yandex_vpc_subnet.subnet.id
+    nat       = false
+    security_group_ids = [yandex_vpc_security_group.security_group.id]
   }
   platform_id = "standard-v3"
   resources {
