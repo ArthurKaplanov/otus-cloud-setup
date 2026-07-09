@@ -120,57 +120,58 @@ resource "yandex_compute_instance" "proxy" {
   zone = var.yc_zone
 }
 
-resource "yandex_compute_instance" "private_vm" {
-  boot_disk {
-    initialize_params {
-      name       = "disk-ubuntu-for-private_vm"
-      type       = "network-ssd"
-      size       = 10
-      block_size = 4096
-      image_id   = "fd87q9coi4v2ap1c9okf"
-    }
-    auto_delete = true
-  }
-  folder_id = var.yc_folder_id
-  metadata = {
-    ssh-keys = "ubuntu:ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG1DB0k45xC+EYl54R0YKEehQrnU0AhEIVloB3SbF8jS https://github.com/ArthurKaplanov"
-  }
-  name                      = "our_private_machine"
-  allow_stopping_for_update = true
-
-  network_interface {
-    subnet_id          = yandex_vpc_subnet.subnet.id
-    nat                = false
-    security_group_ids = [yandex_vpc_security_group.security_group.id]
-  }
-  platform_id = "standard-v3"
-  resources {
-    memory        = 2
-    cores         = 2
-    core_fraction = 100
-  }
-  scheduling_policy {
-    preemptible = true
-  }
-  zone = var.yc_zone
-}
-
-
-# object storage/ s3
-resource "yandex_storage_bucket" "data_bucket" {
-  bucket        = "${var.yc_bucket_name}-${var.yc_folder_id}"
-  access_key    = yandex_iam_service_account_static_access_key.sa_static_key.access_key
-  secret_key    = yandex_iam_service_account_static_access_key.sa_static_key.secret_key
-  force_destroy = true
-}
-
-
 #IAM service 
 data "yandex_iam_service_account" "hw2-service" {
-  name        = var.yc_service_account_name
+  name = var.yc_service_account_name
 }
 
-resource "yandex_iam_service_account_static_access_key" "sa_static_key" {
-  service_account_id = data.yandex_iam_service_account.hw2_service.id
-  description        = "Static access key for object storage"
+# Dataproc ресурсы
+resource "yandex_dataproc_cluster" "dataproc_cluster" {
+  bucket      = var.yc_bucket_name
+  description = "Dataproc Cluster created by Terraform for OTUS HW 2"
+  name        = var.yc_dataproc_cluster_name
+  labels = {
+    created_by = "terraform"
+  }
+  service_account_id = data.yandex_iam_service_account.hw2-service.id
+  zone_id            = var.yc_zone
+  security_group_ids = [yandex_vpc_security_group.security_group.id]
+
+
+  cluster_config {
+    version_id = var.yc_dataproc_version
+
+    hadoop {
+      services = ["HDFS", "YARN", "SPARK", "HIVE", "TEZ"]
+      properties = {
+        "yarn:yarn.resourcemanager.am.max-attempts" = 5
+      }
+      ssh_public_keys = [file(var.public_key_path)]
+    }
+
+    subcluster_spec {
+      name = "master"
+      role = "MASTERNODE"
+      resources {
+        resource_preset_id = var.dataproc_master_resources.resource_preset_id
+        disk_type_id       = var.dataproc_master_resources.disk_type_id
+        disk_size          = var.dataproc_master_resources.disk_size
+      }
+      subnet_id        = yandex_vpc_subnet.subnet.id
+      hosts_count      = 1
+      assign_public_ip = true
+    }
+
+    subcluster_spec {
+      name = "data"
+      role = "DATANODE"
+      resources {
+        resource_preset_id = var.dataproc_data_resources.resource_preset_id
+        disk_type_id       = var.dataproc_data_resources.disk_type_id
+        disk_size          = var.dataproc_data_resources.disk_size
+      }
+      subnet_id   = yandex_vpc_subnet.subnet.id
+      hosts_count = 3
+    }
+  }
 }

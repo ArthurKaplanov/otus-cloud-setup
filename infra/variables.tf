@@ -46,11 +46,70 @@ variable "yc_security_group_name" {
 
 variable "yc_bucket_name" {
   type        = string
-  description = "Name of the bucket"
+  description = "Existing Object Storage bucket name for Data Proc"
 }
 
 variable "yc_service_account_name" {
   type        = string
   description = "Name of the service account"
   default     = "value"
+}
+
+variable "yc_dataproc_cluster_name" {
+  type        = string
+  description = "Name of the Dataproc cluster"
+}
+
+variable "yc_dataproc_version" {
+  type        = string
+  description = "Version of Dataproc"
+}
+
+variable "public_key_path" {
+  type        = string
+  description = "Path to the public key file"
+}
+
+variable "private_key_path" {
+  type        = string
+  description = "Path to the private key file"
+}
+
+variable "dataproc_master_resources" {
+  type = object({
+    resource_preset_id = string
+    disk_type_id       = string
+    disk_size          = number
+  })
+  default = {
+    resource_preset_id = "s3-c2-m8"
+    disk_type_id       = "network-ssd"
+    disk_size          = 40
+  }
+}
+
+variable "dataproc_compute_resources" {
+  type = object({
+    resource_preset_id = string
+    disk_type_id       = string
+    disk_size          = number
+  })
+  default = {
+    resource_preset_id = "s3-c4-m16"
+    disk_type_id       = "network-ssd"
+    disk_size          = 50
+  }
+}
+
+variable "dataproc_data_resources" {
+  type = object({
+    resource_preset_id = string
+    disk_type_id       = string
+    disk_size          = number
+  })
+  default = {
+    resource_preset_id = "s3-c4-m16"
+    disk_type_id       = "network-ssd"
+    disk_size          = 128
+  }
 }

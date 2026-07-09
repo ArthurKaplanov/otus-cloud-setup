@@ -1,10 +1,11 @@
-# otus_hw_2
+# Настройка облачной инфраструктуры для проекта по определению мошеннических транзакций
 
-Data Proccessing, second homework
+[ссылка на задание](https://github.com/OtusTeam/MLOps/tree/main/hw_02)
 
-## Installation
+## Материалы для проверки 
 
-```bash
-uv sync
+**Данные в object storage:** 
+ссылка на s3: s3://hw-2-bucket 
 
-uv run pytest
+**Содержимое Data-подкластера:** 
+![Содержимое hdfs user/ubuntu/data](data/image/hdfs.png)
